@@ -1,0 +1,17 @@
+# Ordner von Visual Studio und .NET
+bin/
+obj/
+.vs/
+
+# Datenbankdatei (Die willst du lokal behalten, nicht auf GitHub!)
+*.db
+*.db-shm
+*.db-wal
+
+# User-spezifische Einstellungen
+*.user
+*.userosscache
+*.sln.docstates
+
+# Veröffentlichte Dateien
+publish/

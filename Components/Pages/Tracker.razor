@@ -1,0 +1,108 @@
+﻿@page "/tracker"
+@using FinanceTracker.Models
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext DbContext
+@rendermode InteractiveServer
+
+<h3>Finanz-Tracker</h3>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-success text-white p-3">
+            <h6>Einnahmen</h6>
+            curr. @totalIncome.ToString("C")
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-danger text-white p-3">
+            <h6>Ausgaben</h6>
+            curr. @totalExpenses.ToString("C")
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-primary text-white p-3">
+            <h6>Kontostand</h6>
+            curr. @balance.ToString("C")
+        </div>
+    </div>
+</div>
+<div class="card p-3 mb-4">
+    <h5>Neue Buchung hinzufügen</h5>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <input class="form-control" @bind="newTransaction.Description" placeholder="Beschreibung (z.B. Miete)" />
+        </div>
+        <div class="col-md-3">
+            <input type="number" class="form-control" @bind="newTransaction.Amount" placeholder="Betrag" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" value="@newTransaction.IsIncome.ToString().ToLower()"
+                    @onchange="@((ChangeEventArgs e) => newTransaction.IsIncome = bool.Parse(e.Value.ToString()))">
+                <option value="true">Einnahme</option>
+                <option value="false">Ausgabe</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100" @onclick="SaveTransaction">Speichern</button>
+        </div>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Datum</th>
+            <th>Beschreibung</th>
+            <th>Betrag</th>
+            <th>Typ</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var t in transactions)
+        {
+            <tr>
+                <td>@t.Date.ToShortDateString()</td>
+                <td>@t.Description</td>
+                <td class="@(t.IsIncome ? "text-success" : "text-danger")">
+                    @(t.IsIncome ? "+" : "-") @t.Amount.ToString("C")
+                </td>
+                <td>@(t.IsIncome ? "Einnahme" : "Ausgabe")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Transaction> transactions = new();
+    private Transaction newTransaction = new() { Date = DateTime.Now };
+    private decimal totalIncome;
+    private decimal totalExpenses;
+    private decimal balance;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTransactions();
+    }
+
+    private async Task LoadTransactions()
+    {
+        transactions = await DbContext.Transactions.OrderByDescending(t => t.Date).ToListAsync();
+
+        // Hier berechnen wir die Summen
+        totalIncome = transactions.Where(t => t.IsIncome).Sum(t => t.Amount);
+        totalExpenses = transactions.Where(t => !t.IsIncome).Sum(t => t.Amount);
+        balance = totalIncome - totalExpenses;
+    }
+
+    private async Task SaveTransaction()
+    {
+        if (string.IsNullOrWhiteSpace(newTransaction.Description) || newTransaction.Amount == 0) return;
+
+        DbContext.Transactions.Add(newTransaction);
+        await DbContext.SaveChangesAsync();
+
+        // Formular zurücksetzen und Liste neu laden
+        newTransaction = new Transaction { Date = DateTime.Now };
+        await LoadTransactions();
+    }
+}
