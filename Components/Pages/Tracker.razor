@@ -1,4 +1,6 @@
-﻿@page "/tracker"
+﻿@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@page "/tracker"
+@using FinanceTracker.Data
 @using FinanceTracker.Models
 @using Microsoft.EntityFrameworkCore
 @inject AppDbContext DbContext

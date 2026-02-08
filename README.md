@@ -6,19 +6,21 @@ Diese Anwendung hilft dabei, Einnahmen und Ausgaben im Blick zu behalten und kom
 
 ## 🚀 Vision & Features
 
-### Aktueller Stand (MVP)
-- **Einnahmen & Ausgaben:** Schnelles Erfassen von Transaktionen.
-- **Dashboard:** Echtzeit-Berechnung des Kontostands und der Summen.
-- **SQLite Integration:** Robuste Datenhaltung in einer lokalen Datei.
-- **Responsive UI:** Optimiert für die Nutzung am Smartphone (ideal für unterwegs) und PC.
+## 🚀 Features
 
-### Geplante Erweiterungen (Roadmap)
-- [ ] **Multi-User Login:** Sicheres Authentifizierungssystem für verschiedene Benutzer.
-- [ ] **Social Debt Tracking:** - Andere Nutzer als Gläubiger oder Schuldner direkt im System verknüpfen.
-    - Gemeinsame Verwaltung von Schuldenständen.
-- [ ] **Bestätigungsworkflow (Vier-Augen-Prinzip):** - Wenn ein Gläubiger eine Zahlung einträgt (z. B. Sondertilgung), muss der Schuldner dies bestätigen, bevor der Saldo aktualisiert wird.
-    - Schutz vor Fehleingaben oder vergessenen Einträgen.
-- [ ] **Hosting auf Raspberry Pi:** Automatischer Start als Linux-Service.
+### ✅ Bereits implementiert
+- **Multi-User System:** Vollständiges Login- & Registrierungssystem (ASP.NET Identity).
+- **Social Debt Tracking:** Forderungen und Schulden zwischen Nutzern verknüpfen.
+- **Bestätigungsworkflow:** Schutz vor einseitigen Einträgen durch Akzeptieren/Ablehnen.
+- **Detaillierter Zahlungsverlauf:** Teilzahlungen mit Historie pro Forderung.
+- **Persönliches Dashboard:** Finanzielle Übersicht (Netto-Saldo) sofort nach Login.
+
+### 🛠 In Arbeit / Roadmap
+- [ ] **Daueraufträge & Fixkosten:** Automatische monatliche Buchung von Einnahmen/Ausgaben (z.B. Miete, Gehalt).
+- [ ] **Integriertes Payment:** Schulden direkt aus dem eigenen Budget-Modul begleichen (Verknüpfung von Schulden und Transaktionen).
+- [ ] **Automatisierte Tilgungspläne:** Monatliche Ratenzahlungen für Schulden festlegen.
+- [ ] **KI-Prognose:** Automatische Berechnung des "Enddatums" einer Schuld basierend auf dem aktuellen Tilgungsverhalten.
+- [ ] **Grafische Auswertungen:** Tortendiagramme für Ausgabenkategorien.
 
 ## 🛠 Tech Stack
 

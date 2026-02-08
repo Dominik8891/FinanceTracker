@@ -1,0 +1,341 @@
+﻿@page "/debts"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using FinanceTracker.Data
+@using FinanceTracker.Models
+@using System.Security.Claims
+@attribute [Authorize]
+@inject AppDbContext DbContext
+@inject AuthenticationStateProvider AuthProvider
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>🤝 Gläubiger-Verwaltung</h3>
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 bg-primary text-white shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 opacity-75">Offene Forderungen Gesamt</h6>
+                        <h2 class="card-title mb-0">@myClaims.Sum(d => d.RemainingAmount).ToString("C")</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-success text-white shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 opacity-75">Bereits erhalten (aktiv)</h6>
+                        <h2 class="card-title mb-0">@myClaims.Sum(d => d.PaidAmount).ToString("C")</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-info text-white shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 opacity-75">Anzahl offener Posten</h6>
+                        <h2 class="card-title mb-0">@myClaims.Count</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="btn btn-primary" @onclick="ShowAddForm">➕ Neue Forderung anmelden</button>
+    </div>
+
+    @if (showForm)
+    {
+        <div class="card mb-4 border-primary shadow">
+            <div class="card-body">
+                <h5>Neue Forderung erstellen</h5>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="small text-muted">Wer schuldet?</label>
+                        <input type="text" class="form-control" placeholder="Name" @bind="newDebt.DebtorName" list="nameSuggestions" />
+                        <datalist id="nameSuggestions">
+                            @foreach (var user in allUsers)
+                            {
+                                <option value="@user.FirstName">@user.Email</option>
+                            }
+                        </datalist>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="small text-muted">Wieviel (€)?</label>
+                        <input type="number" class="form-control" placeholder="0.00" @bind="newDebt.Amount" />
+                    </div>
+                    <div class="col-md-5">
+                        <label class="small text-muted">Notiz/Zweck</label>
+                        <input type="text" class="form-control" placeholder="Wofür war das?" @bind="newDebt.Description" />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-success w-100" @onclick="SaveDebt">Speichern</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white fw-bold">Meine Forderungen (Offen)</div>
+                <div class="card-body p-2">
+                    @if (!myClaims.Any())
+                    {
+                        <p class="text-center text-muted mt-3">Keine offenen Forderungen.</p>
+                    }
+                    @foreach (var d in myClaims)
+                    {
+                        <div class="list-group-item border rounded mb-3 p-3 bg-white shadow-sm">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <span class="badge @GetStatusClass(d.Status) mb-1">@d.Status</span>
+                                    <h5 class="mb-0">@d.DebtorName</h5>
+                                    <small class="text-muted">@d.Description</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="h4 mb-0 text-primary">@d.RemainingAmount.ToString("C")</div>
+                                    <small class="text-muted">von @d.Amount.ToString("C")</small>
+                                </div>
+                            </div>
+
+                            @if (d.Repayments != null && d.Repayments.Any())
+                            {
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-link p-0 text-decoration-none" @onclick="() => ToggleDetails(d.Id)">
+                                        <span class="bi @(expandedIds.Contains(d.Id) ? "bi-chevron-up" : "bi-clock-history")"></span>
+                                        @(expandedIds.Contains(d.Id) ? "Verlauf ausblenden" : $"Bisher gezahlt: {d.PaidAmount.ToString("C")}")
+                                    </button>
+
+                                    @if (expandedIds.Contains(d.Id))
+                                    {
+                                        <div class="mt-2 p-2 bg-light rounded border-start border-info border-3 shadow-sm animate-fade-in">
+                                            @foreach (var pay in d.Repayments.OrderByDescending(p => p.DatePaid))
+                                            {
+                                                <div class="d-flex justify-content-between small py-1 border-bottom border-white">
+                                                    <span>📅 @pay.DatePaid.ToString("dd.MM. HH:mm")</span>
+                                                    <span class="fw-bold text-success">+ @pay.Amount.ToString("C")</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                <div class="input-group input-group-sm" style="width: 180px;">
+                                    <span class="input-group-text">Tilgen:</span>
+                                    <input type="number"
+                                           class="form-control"
+                                           placeholder="0,00"
+                                           step="0.01"
+                                           @bind="repaymentAmounts[d.Id]"
+                                           @bind:event="oninput"
+                                           @onchange="@(() => HandleRepaymentChange(d))" />
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteDebt(d)">
+                                    <span class="bi bi-trash"></span>
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-warning text-dark fw-bold">Anfragen an mich</div>
+                <div class="card-body p-2">
+                    @if (!debtsToConfirm.Any())
+                    {
+                        <p class="text-center text-muted mt-3">Keine neuen Anfragen.</p>
+                    }
+                    @foreach (var d in debtsToConfirm)
+                    {
+                        <div class="list-group-item border rounded mb-2 p-3">
+                            <p class="mb-2"><strong>@d.DebtorName</strong> (Ich) soll <strong>@d.Amount.ToString("C")</strong> an jemanden zahlen.</p>
+                            <small class="d-block mb-3 text-muted">Zweck: @d.Description</small>
+                            <div class="btn-group w-100 shadow-sm">
+                                <button class="btn btn-success" @onclick="() => UpdateStatus(d, DebtStatus.Confirmed)">✔ Bestätigen</button>
+                                <button class="btn btn-outline-danger" @onclick="() => UpdateStatus(d, DebtStatus.Rejected)">Ablehnen</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr />
+    <div class="text-center mb-4">
+        <button class="btn btn-outline-secondary" @onclick="() => showArchive = !showArchive">
+            <span class="bi @(showArchive ? "bi-eye-slash" : "bi-archive") me-2"></span>
+            @(showArchive ? "Archiv ausblenden" : $"Erledigte Forderungen anzeigen ({archivedClaims.Count})")
+        </button>
+    </div>
+
+    @if (showArchive)
+    {
+        <div class="row animate-fade-in">
+            @foreach (var d in archivedClaims)
+            {
+                <div class="col-md-6 mb-3">
+                    <div class="card bg-light border-success shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-0 text-success">✔ @d.DebtorName</h6>
+                                    <small class="text-muted">@d.Description</small>
+                                </div>
+                                <span class="badge bg-success">@d.Amount.ToString("C") bezahlt</span>
+                            </div>
+
+                            <div class="mt-2 pt-2 border-top">
+                                <small class="fw-bold text-uppercase d-block mb-1" style="font-size: 0.6rem;">Zahlungsverlauf:</small>
+                                @foreach (var pay in d.Repayments.OrderBy(p => p.DatePaid))
+                                {
+                                    <div class="d-flex justify-content-between small text-muted border-bottom py-1">
+                                        <span>📅 @pay.DatePaid.ToString("dd.MM.yyyy")</span>
+                                        <span class="fw-bold text-dark">+ @pay.Amount.ToString("C")</span>
+                                    </div>
+                                }
+                                <div class="text-success small fw-bold mt-2">
+                                    <i class="bi bi-calendar-check"></i> Vollständig am @(d.Repayments.Any() ? d.Repayments.Max(p => p.DatePaid).ToString("dd.MM.yyyy") : "-")
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Debt> myClaims = new();
+    private List<Debt> debtsToConfirm = new();
+    private List<Debt> archivedClaims = new();
+    private List<ApplicationUser> allUsers = new();
+    private Debt newDebt = new();
+    private bool showForm = false;
+    private bool showArchive = false;
+    private string? currentUserId;
+    private string? currentUserEmail;
+    private Dictionary<int, decimal> repaymentAmounts = new();
+    private HashSet<int> expandedIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        currentUserEmail = authState.User.Identity?.Name;
+        await LoadData();
+        allUsers = await DbContext.Users.ToListAsync();
+    }
+
+    private async Task LoadData()
+    {
+        myClaims = await DbContext.Debts
+            .Include(d => d.Repayments)
+            .Where(d => d.CreditorUserId == currentUserId && d.Status != DebtStatus.Paid)
+            .ToListAsync();
+
+        archivedClaims = await DbContext.Debts
+            .Include(d => d.Repayments)
+            .Where(d => d.CreditorUserId == currentUserId && d.Status == DebtStatus.Paid)
+            .ToListAsync();
+
+        debtsToConfirm = await DbContext.Debts
+            .Where(d => d.DebtorEmail == currentUserEmail && d.Status == DebtStatus.Pending)
+            .ToListAsync();
+
+        foreach (var d in myClaims)
+        {
+            if (!repaymentAmounts.ContainsKey(d.Id)) repaymentAmounts[d.Id] = 0;
+        }
+    }
+
+    private void ShowAddForm() => showForm = !showForm;
+
+    private async Task SaveDebt()
+    {
+        if (string.IsNullOrEmpty(newDebt.DebtorName) || newDebt.Amount <= 0) return;
+
+        newDebt.CreditorUserId = currentUserId!;
+        var linkedUser = allUsers.FirstOrDefault(u => u.FirstName.Equals(newDebt.DebtorName, StringComparison.OrdinalIgnoreCase));
+
+        if (linkedUser != null)
+        {
+            newDebt.DebtorEmail = linkedUser.Email;
+            newDebt.Status = DebtStatus.Pending;
+        }
+        else
+        {
+            newDebt.Status = DebtStatus.Confirmed;
+        }
+
+        DbContext.Debts.Add(newDebt);
+        await DbContext.SaveChangesAsync();
+        newDebt = new Debt();
+        showForm = false;
+        await LoadData();
+    }
+
+    private async Task HandleRepaymentChange(Debt debt)
+    {
+        // Den Wert direkt aus dem Dictionary holen
+        if (repaymentAmounts.TryGetValue(debt.Id, out var amountToPay) && amountToPay > 0)
+        {
+            // 1. Zahlung speichern
+            var payment = new Repayment
+            {
+                DebtId = debt.Id,
+                Amount = amountToPay,
+                DatePaid = DateTime.Now
+            };
+            DbContext.Repayments.Add(payment);
+
+            // 2. Schuld aktualisieren
+            debt.PaidAmount += amountToPay;
+            if (debt.RemainingAmount <= 0) debt.Status = DebtStatus.Paid;
+
+            await DbContext.SaveChangesAsync();
+
+            // 3. WICHTIG: Dictionary auf 0 setzen
+            repaymentAmounts[debt.Id] = 0;
+
+            // 4. UI aktualisieren
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+
+    private async Task UpdateStatus(Debt debt, DebtStatus status)
+    {
+        debt.Status = status;
+        await DbContext.SaveChangesAsync();
+        await LoadData();
+    }
+
+    private async Task DeleteDebt(Debt debt)
+    {
+        DbContext.Debts.Remove(debt);
+        await DbContext.SaveChangesAsync();
+        await LoadData();
+    }
+
+    private void ToggleDetails(int debtId)
+    {
+        if (expandedIds.Contains(debtId))
+            expandedIds.Remove(debtId);
+        else
+            expandedIds.Add(debtId);
+    }
+
+    private string GetStatusClass(DebtStatus status) => status switch
+    {
+        DebtStatus.Pending => "bg-warning text-dark",
+        DebtStatus.Confirmed => "bg-primary",
+        DebtStatus.Paid => "bg-success",
+        DebtStatus.Rejected => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
