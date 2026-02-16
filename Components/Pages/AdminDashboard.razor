@@ -1,0 +1,159 @@
+﻿@page "/admin"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using FinanceTracker.Models
+@attribute [Authorize(Roles = "Admin")]
+@inject AuthenticationStateProvider AuthProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject IJSRuntime JS
+
+<div class="container mt-4">
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> @statusMessage
+            <button type="button" class="btn-close" @onclick='() => statusMessage = ""' aria-label="Close"></button>
+        </div>
+    }
+    <h3>🛠 Admin-Zentrale</h3>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-dark text-white">Benutzerverwaltung</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Reset-Status</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in allUsers)
+                    {
+                        <tr>
+                            <td>@user.FirstName</td>
+                            <td>@user.Email</td>
+                            <td>
+                                @if (user.IsPasswordResetPending)
+                                {
+                                    @if (!string.IsNullOrEmpty(user.PasswordResetCode))
+                                    {
+                                        @* Diese Ansicht erscheint, SOBALD du den Code generiert hast *@
+                                        <div class="d-flex flex-column">
+                                            <span class="badge bg-primary fs-6 mb-1" style="width: fit-content;">
+                                                <i class="bi bi-key-fill"></i> @user.PasswordResetCode
+                                            </span>
+                                            <small class="text-muted fw-bold">Code für den Nutzer</small>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @* Diese Ansicht erscheint, wenn der User Hilfe angefordert hat, du aber noch keinen Code erstellt hast *@
+                                        <span class="badge bg-warning text-dark px-2 py-1">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Hilfe angefordert
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Aktiv</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group">
+                                    @* DER RESET-BUTTON: Nur sichtbar, wenn IsPasswordResetPending true ist *@
+                                    @if (user.IsPasswordResetPending)
+                                    {
+                                        <button class="btn btn-sm btn-success" @onclick="() => EnableReset(user)">
+                                            <i class="bi bi-check-lg"></i> Code generieren
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => CancelReset(user)">
+                                            Abbrechen
+                                        </button>
+                                    }
+
+                                    @* LÖSCHEN-BUTTON: Immer sichtbar (außer für dich selbst) *@
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => ConfirmDelete(user)"
+                                            title="Benutzer löschen">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ApplicationUser> allUsers = new();
+
+    protected override async Task OnInitializedAsync() => await LoadUsers();
+
+    private async Task LoadUsers() => allUsers = UserManager.Users.ToList();
+
+    private string? statusMessage;
+
+    private async Task ShowStatus(string message)
+    {
+        statusMessage = message;
+        StateHasChanged(); // Seite neu rendern
+
+        // Nach 4 Sekunden verschwindet die Nachricht automatisch
+        await Task.Delay(4000);
+        statusMessage = "";
+        StateHasChanged();
+    }
+
+    private async Task EnableReset(ApplicationUser user)
+    {
+        user.IsPasswordResetPending = true;
+        user.PasswordResetCode = new Random().Next(1000, 9999).ToString();
+        await UserManager.UpdateAsync(user);
+        await LoadUsers();
+
+        await ShowStatus($"Reset-Code für {user.FirstName} wurde generiert!");
+    }
+
+    private async Task CancelReset(ApplicationUser user)
+    {
+        user.IsPasswordResetPending = false;
+        user.PasswordResetCode = null;
+        await UserManager.UpdateAsync(user);
+        await LoadUsers();
+    }
+
+    private async Task ConfirmDelete(ApplicationUser user)
+    {
+        // Öffnet ein natives Browser-Fenster mit "OK" und "Abbrechen"
+        var confirmed = await JS.InvokeAsync<bool>("confirm",
+            $"Bist du sicher, dass du den Benutzer '{user.Email}' unwiderruflich löschen möchtest?");
+
+        if (confirmed)
+        {
+            await DeleteUser(user);
+        }
+    }
+
+    private async Task DeleteUser(ApplicationUser user)
+    {
+        // Selbstschutz: Admin darf sich nicht selbst löschen
+        var currentUser = await UserManager.GetUserAsync((await AuthProvider.GetAuthenticationStateAsync()).User);
+
+        if (user.Id == currentUser?.Id)
+        {
+            // Hier könnte man noch eine Fehlermeldung ausgeben
+            return;
+        }
+
+        await UserManager.DeleteAsync(user);
+        await LoadUsers();
+
+        await ShowStatus($"Benutzer {user.Email} wurde erfolgreich gelöscht.");
+    }
+}

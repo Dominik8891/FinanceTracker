@@ -9,6 +9,7 @@ Diese Anwendung hilft dabei, Einnahmen und Ausgaben im Blick zu behalten und kom
 ## 🚀 Features
 
 ### ✅ Bereits implementiert
+- **Admin-basiertes Passwort-Reset:** Lokale Sicherheitslogik ohne externe SMTP-Abhängigkeit (ideal für Edge-Computing/Intranet).
 - **Multi-User System:** Vollständiges Login- & Registrierungssystem (ASP.NET Identity).
 - **Social Debt Tracking:** Forderungen und Schulden zwischen Nutzern verknüpfen.
 - **Bestätigungsworkflow:** Schutz vor einseitigen Einträgen durch Akzeptieren/Ablehnen.
@@ -29,6 +30,14 @@ Diese Anwendung hilft dabei, Einnahmen und Ausgaben im Blick zu behalten und kom
 - **Datenbank:** SQLite
 - **ORM:** Entity Framework Core (EF Core)
 - **Styling:** Bootstrap 5
+
+## 🔒 Sicherheits- & Architekturkonzept
+
+Da dieses Projekt speziell für den **lokalen Betrieb (Self-Hosted/Pi)** optimiert ist, wurden bewusste Architekturentscheidungen getroffen:
+
+* **Offline-First:** Das System benötigt keine aktive Internetverbindung. 
+* **Hybrides Password-Recovery:** Statt unsicherer E-Mail-Konfigurationen in privaten Netzwerken nutzt die App ein Admin-Verifizierungssystem. Nutzer beantragen einen Reset, der Administrator generiert im geschützten Dashboard einen Einmal-Token.
+* **Role-Based Access Control (RBAC):** Strikte Trennung zwischen Admin-Funktionen (User-Management, Reset-Freigaben) und Nutzer-Funktionen (Finanzdaten).
 
 ## 🛠 Voraussetzungen (Prerequisites)
 

@@ -14,6 +14,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options => {
     options.Password.RequireDigit = false;
     options.Password.RequiredLength = 6;
 })
+.AddRoles<IdentityRole>()
 .AddEntityFrameworkStores<AppDbContext>();
 
 builder.Services.AddCascadingAuthenticationState();
@@ -47,5 +48,31 @@ app.UseAntiforgery();
 app.MapRazorPages();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+
+    // 1. Sicherstellen, dass die Rolle "Admin" existiert
+    if (!await roleManager.RoleExistsAsync("Admin"))
+    {
+        await roleManager.CreateAsync(new IdentityRole("Admin"));
+    }
+
+    // 2. Prüfen, ob dein User existiert und ihm die Rolle geben
+    // Ersetze "deine@email.de" durch deine echte Email
+    var adminUser = await userManager.FindByEmailAsync("dominikkusber33@gmail.com");
+
+    if (adminUser != null)
+    {
+        var isInRole = await userManager.IsInRoleAsync(adminUser, "Admin");
+        if (!isInRole)
+        {
+            await userManager.AddToRoleAsync(adminUser, "Admin");
+        }
+    }
+}
 
 app.Run();
